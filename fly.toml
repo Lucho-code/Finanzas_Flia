@@ -1,0 +1,49 @@
+app = "family-finance-bot"
+primary_region = "gru"
+
+[build]
+
+[processes]
+  bot = "python bot.py"
+  web = "streamlit run admin_panel.py --server.headless true --server.port 8080 --server.address 0.0.0.0"
+
+[env]
+  DB_PATH = "/data/finanzas.db"
+
+[[services]]
+  processes = ["web"]
+  internal_port = 8080
+  protocol = "tcp"
+  auto_stop_machines = false
+  auto_start_machines = true
+
+  [[services.ports]]
+    force_https = true
+    handlers = ["http"]
+    port = 80
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
+  [services.concurrency]
+    type = "requests"
+    hard_limit = 25
+    soft_limit = 20
+
+[[vm]]
+  processes = ["bot"]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[[vm]]
+  processes = ["web"]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[[mounts]]
+  source = "family_finance_data"
+  destination = "/data"
+  initial_size = "1gb"
