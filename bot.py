@@ -53,6 +53,7 @@ PALABRAS_INGRESO = [
     "gané", "gane",
     "me pagaron", "me depositaron", "depositaron",
     "entrada de plata",
+    "aporté", "aporte", "aporto", "aportación", "aportacion",
 ]
 
 

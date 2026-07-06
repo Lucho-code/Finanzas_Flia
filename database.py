@@ -43,6 +43,7 @@ CATEGORIAS_DEFAULT = [
     ("Otros gastos",     "gasto", None, ""),
     ("Sueldo",           "ingreso", None, "sueldo,salario,quincena"),
     ("Extra",            "ingreso", None, "aguinaldo,bono,freelance,changa,venta"),
+    ("Aporte al fondo",  "ingreso", None, "aporte,aporté,aporto,aportacion,aportación,fondo comun,fondo común"),
     ("Otros ingresos",   "ingreso", None, ""),
 ]
 
@@ -89,13 +90,13 @@ class Database:
         self.conn.commit()
 
     def _seed_categorias(self):
-        count = self.conn.execute("SELECT COUNT(*) FROM categories").fetchone()[0]
-        if count == 0:
-            self.conn.executemany(
-                "INSERT OR IGNORE INTO categories (name, type, budget_monthly, keywords) VALUES (?, ?, ?, ?)",
-                CATEGORIAS_DEFAULT,
-            )
-            self.conn.commit()
+        """INSERT OR IGNORE por nombre: agrega categorías nuevas de CATEGORIAS_DEFAULT
+        sin duplicar ni tocar las que el usuario ya tiene creadas o editadas."""
+        self.conn.executemany(
+            "INSERT OR IGNORE INTO categories (name, type, budget_monthly, keywords) VALUES (?, ?, ?, ?)",
+            CATEGORIAS_DEFAULT,
+        )
+        self.conn.commit()
 
     # ---------- members ----------
 
