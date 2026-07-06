@@ -264,6 +264,7 @@ async def cmd_ayuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "*Consultas:*\n"
         "  /saldo — saldo del mes actual\n"
         "  /resumen — gastos por categoría del mes\n"
+        "  /dividir — reparte el gasto del mes y dice quién le debe a quién\n"
         "  /categorias — lista las categorías disponibles\n"
         "\n"
         "*Corrección:*\n"
@@ -351,6 +352,53 @@ async def cmd_resumen(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not hubo_datos:
         lines.append("  Sin gastos registrados este mes.")
+
+    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+
+async def cmd_dividir(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Reparte el gasto del mes en partes iguales entre los miembros registrados
+    y muestra quién le debe a quién según lo que cada uno aportó de ingreso."""
+    user = update.effective_user
+    if not db.get_member(user.id):
+        await _pedir_nombre(update, context)
+        return
+
+    hoy = ahora().date()
+    start, end = db.month_bounds(hoy)
+    div = db.calcular_division_gastos(start, end)
+
+    if len(div["miembros"]) < 2:
+        await update.message.reply_text(
+            "Hace falta que haya al menos 2 miembros registrados para dividir gastos."
+        )
+        return
+
+    n = len(div["miembros"])
+    lines = [
+        f"*División de gastos — {MESES_ES[hoy.month]} {hoy.year}*",
+        f"Gasto total: ${div['total_gastos']:,.2f}",
+        f"Cuota por integrante ({n}): ${div['cuota']:,.2f}",
+        "",
+    ]
+    for m in div["miembros"]:
+        signo = "+" if m["diferencia"] >= 0 else "-"
+        lines.append(
+            f"  {m['name']}: aportó ${m['aportado']:,.2f} → {signo}${abs(m['diferencia']):,.2f}"
+        )
+
+    lines.append("")
+    if div["transferencias"]:
+        lines.append("*Para equilibrar:*")
+        for t in div["transferencias"]:
+            lines.append(f"  {t['de_nombre']} → {t['a_nombre']}: ${t['monto']:,.2f}")
+    else:
+        lines.append("Ya están equilibrados, no hace falta transferir nada.")
+
+    saldo_fondo = div["total_ingresos"] - div["total_gastos"]
+    estado = "superávit" if saldo_fondo >= 0 else "déficit"
+    lines.append("")
+    lines.append(f"Fondo común: {estado} de ${abs(saldo_fondo):,.2f} este mes.")
 
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
@@ -866,6 +914,7 @@ def main():
     app.add_handler(CommandHandler("ingreso",          cmd_ingreso))
     app.add_handler(CommandHandler("saldo",            cmd_saldo))
     app.add_handler(CommandHandler("resumen",          cmd_resumen))
+    app.add_handler(CommandHandler("dividir",          cmd_dividir))
     app.add_handler(CommandHandler("categorias",       cmd_categorias))
     app.add_handler(CommandHandler("categoria_nueva",  cmd_categoria_nueva))
     app.add_handler(CommandHandler("categoria_borrar", cmd_categoria_borrar))

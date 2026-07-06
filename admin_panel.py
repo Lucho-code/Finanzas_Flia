@@ -100,6 +100,35 @@ with tab_hoy:
     else:
         st.info("No hay miembros registrados aún.")
 
+    st.divider()
+    st.subheader("División de gastos")
+    div = db.calcular_division_gastos(start, end)
+    if len(div["miembros"]) >= 2:
+        st.caption(
+            f"Gasto total ${div['total_gastos']:,.2f} ÷ {len(div['miembros'])} integrantes "
+            f"= ${div['cuota']:,.2f} de cuota por persona."
+        )
+        filas_div = [{
+            "Miembro":     m["name"],
+            "Aportó":      f"${m['aportado']:,.2f}",
+            "Cuota":       f"${div['cuota']:,.2f}",
+            "Diferencia":  f"{'+' if m['diferencia'] >= 0 else '-'}${abs(m['diferencia']):,.2f}",
+        } for m in div["miembros"]]
+        st.dataframe(pd.DataFrame(filas_div), use_container_width=True, hide_index=True)
+
+        if div["transferencias"]:
+            st.markdown("**Para equilibrar:**")
+            for t in div["transferencias"]:
+                st.write(f"- {t['de_nombre']} → {t['a_nombre']}: ${t['monto']:,.2f}")
+        else:
+            st.success("Ya están equilibrados, no hace falta transferir nada.")
+
+        saldo_fondo = div["total_ingresos"] - div["total_gastos"]
+        estado = "superávit" if saldo_fondo >= 0 else "déficit"
+        st.caption(f"Fondo común: {estado} de ${abs(saldo_fondo):,.2f} este mes.")
+    else:
+        st.info("Hace falta al menos 2 miembros registrados para calcular la división.")
+
 # ── TAB 2: Movimientos ────────────────────────────────────────────────────
 with tab_mov:
     st.subheader("Últimos movimientos")

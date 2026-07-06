@@ -276,3 +276,67 @@ class Database:
     def month_bounds(self, d: date) -> tuple:
         last = monthrange(d.year, d.month)[1]
         return d.replace(day=1), d.replace(day=last)
+
+    # ---------- división de gastos ----------
+
+    def calcular_division_gastos(self, start: date, end: date) -> dict:
+        """Reparte el gasto total del período en partes iguales entre los miembros
+        registrados, y lo compara contra el ingreso que aportó cada uno para ver
+        quién le debe a quién. Devuelve:
+          {
+            'total_gastos': float, 'total_ingresos': float, 'cuota': float,
+            'miembros': [{'telegram_id','name','aportado','diferencia'}, ...],
+            'transferencias': [{'de_id','de_nombre','a_id','a_nombre','monto'}, ...],
+          }
+        'diferencia' positiva = aportó de más (le deben); negativa = debe poner esa
+        diferencia para igualar su cuota.
+        """
+        members = self.list_members()
+        n = len(members)
+        total_gastos   = self.get_balance(start, end)["gastos"]
+        total_ingresos = self.get_balance(start, end)["ingresos"]
+        cuota = total_gastos / n if n else 0.0
+
+        detalle = []
+        for m in members:
+            aportado = self.get_balance(start, end, m["telegram_id"])["ingresos"]
+            detalle.append({
+                "telegram_id": m["telegram_id"],
+                "name": m["name"],
+                "aportado": aportado,
+                "diferencia": round(aportado - cuota, 2),
+            })
+
+        # Algoritmo de liquidación (greedy): empareja al mayor deudor con el mayor
+        # acreedor hasta saldar todas las diferencias con el mínimo de transferencias.
+        deudores   = sorted([dict(d) for d in detalle if d["diferencia"] < -0.01],
+                             key=lambda d: d["diferencia"])
+        acreedores = sorted([dict(d) for d in detalle if d["diferencia"] > 0.01],
+                             key=lambda d: -d["diferencia"])
+
+        transferencias = []
+        i = j = 0
+        while i < len(deudores) and j < len(acreedores):
+            deudor   = deudores[i]
+            acreedor = acreedores[j]
+            monto = round(min(-deudor["diferencia"], acreedor["diferencia"]), 2)
+            if monto > 0.01:
+                transferencias.append({
+                    "de_id": deudor["telegram_id"], "de_nombre": deudor["name"],
+                    "a_id": acreedor["telegram_id"], "a_nombre": acreedor["name"],
+                    "monto": monto,
+                })
+            deudor["diferencia"]   += monto
+            acreedor["diferencia"] -= monto
+            if abs(deudor["diferencia"]) < 0.01:
+                i += 1
+            if abs(acreedor["diferencia"]) < 0.01:
+                j += 1
+
+        return {
+            "total_gastos": total_gastos,
+            "total_ingresos": total_ingresos,
+            "cuota": cuota,
+            "miembros": detalle,
+            "transferencias": transferencias,
+        }
