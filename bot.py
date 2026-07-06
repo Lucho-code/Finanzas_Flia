@@ -405,6 +405,43 @@ async def cmd_categoria_nueva(update: Update, context: ContextTypes.DEFAULT_TYPE
     await update.message.reply_text(f"Categoría creada: *{nombre.strip()}* ({tipo}){extra}", parse_mode="Markdown")
 
 
+async def cmd_categoria_borrar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Uso: /categoria_borrar Nombre"""
+    if not es_admin(update.effective_user.id):
+        return
+    if not context.args:
+        await update.message.reply_text(
+            "Uso: /categoria_borrar Nombre\nEjemplo: /categoria_borrar Mascotas"
+        )
+        return
+
+    nombre = " ".join(context.args)
+    matches = db.find_category_by_name(nombre)
+    if not matches:
+        await update.message.reply_text("No encontré esa categoría.")
+        return
+    if len(matches) > 1:
+        await update.message.reply_text(
+            f"Varios resultados: {', '.join(m['name'] for m in matches)}. Sé más específico."
+        )
+        return
+
+    cat = matches[0]
+    if cat["name"] in db.PROTECTED_CATEGORIES:
+        await update.message.reply_text(
+            f"No se puede borrar *{cat['name']}* — el sistema la usa como categoría por defecto.",
+            parse_mode="Markdown",
+        )
+        return
+
+    db.delete_category(cat["id"])
+    await update.message.reply_text(
+        f"Categoría eliminada: *{cat['name']}*\n"
+        f"Los movimientos que ya tenían esta categoría van a figurar como \"Sin categoría\".",
+        parse_mode="Markdown",
+    )
+
+
 async def cmd_presupuesto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Uso: /presupuesto Categoria monto"""
     if not es_admin(update.effective_user.id):
@@ -831,6 +868,7 @@ def main():
     app.add_handler(CommandHandler("resumen",          cmd_resumen))
     app.add_handler(CommandHandler("categorias",       cmd_categorias))
     app.add_handler(CommandHandler("categoria_nueva",  cmd_categoria_nueva))
+    app.add_handler(CommandHandler("categoria_borrar", cmd_categoria_borrar))
     app.add_handler(CommandHandler("presupuesto",      cmd_presupuesto))
     app.add_handler(CommandHandler("miembros",         cmd_miembros))
     app.add_handler(CommandHandler("ver",              cmd_ver))

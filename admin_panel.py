@@ -176,6 +176,25 @@ with tab_cat:
         else:
             st.warning("Escribí el nombre de la categoría.")
 
+    st.divider()
+    st.subheader("Eliminar categoría")
+    cats_borrables = [c for c in (cats_gasto + cats_ingreso) if c["name"] not in db.PROTECTED_CATEGORIES]
+    if cats_borrables:
+        cat_borrar = st.selectbox(
+            "Categoría a eliminar",
+            options=[c["name"] for c in cats_borrables],
+            key="selectbox_borrar_categoria",
+        )
+        st.caption("Los movimientos que ya usaban esta categoría van a figurar como \"Sin categoría\". No se borran.")
+        confirmar = st.checkbox(f"Confirmo que quiero eliminar \"{cat_borrar}\"", key="confirmar_borrar_categoria")
+        if st.button("🗑️ Eliminar categoría", disabled=not confirmar):
+            cat_obj = next(c for c in cats_borrables if c["name"] == cat_borrar)
+            db.delete_category(cat_obj["id"])
+            st.success(f"Categoría eliminada: {cat_borrar}")
+            st.rerun()
+    else:
+        st.info("No hay categorías eliminables (las de \"Otros\" son necesarias para el sistema).")
+
 # ── TAB 4: Reportes ────────────────────────────────────────────────────────
 with tab_rep:
     st.subheader("Descargar reporte XLSX")

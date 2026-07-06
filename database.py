@@ -162,6 +162,20 @@ class Database:
         )
         self.conn.commit()
 
+    PROTECTED_CATEGORIES = ("Otros gastos", "Otros ingresos")
+
+    def delete_category(self, category_id: int) -> bool:
+        """Elimina una categoría. Los movimientos que ya la usaban quedan como
+        'Sin categoría' (no se borran). Protege las categorías de fallback
+        ('Otros gastos'/'Otros ingresos') porque el resto del sistema las
+        necesita como destino por defecto."""
+        cat = self.get_category(category_id)
+        if not cat or cat["name"] in self.PROTECTED_CATEGORIES:
+            return False
+        cur = self.conn.execute("DELETE FROM categories WHERE id = ?", (category_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
     def detect_category(self, texto: str, tipo: str):
         """Busca la categoría cuyas keywords coincidan con el texto (por palabra completa,
         para que 'gas' no matchee dentro de 'gasté' o 'gasto'). None si no hay match."""
